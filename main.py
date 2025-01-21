@@ -1,9 +1,13 @@
+import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from IPython.display import Markdown, display
 from openai import OpenAI
 import os
 import requests
+from helper import jsonToDict
 
 # Some websites need you to use proper headers when fetching them:
 headers = {
@@ -46,12 +50,11 @@ class Website:
             print(f"Failed to parse the webpage content. Error: {e}")
             return None
 
-webcontent = Website("https://edwarddonner.com")
-# webcontent = Website("https://www.microsoft.com/en-us/")
+webcontent = Website("https://www.weather.gov/lox/")
 webcontent.fetch_content()
-print(webcontent.title)
-print(webcontent.text)
-print("Links =>", webcontent.links)
+print('website title',webcontent.title)
+print('website content', webcontent.text)
+print("website Links =>", webcontent.links)
 
 # Load environment variables in a file called .env
 load_dotenv()
@@ -94,16 +97,11 @@ messages = [
     {"role": "user", "content": links_user_prompt}
 ]
 
-# response = openai.chat.completions.create(model="gpt-4o-mini", messages=messages)
+response = openai.chat.completions.create(model="gpt-4o-mini", messages=messages)
 # print("response from LLM: ", response.choices[0].message.content)
-# links = response.choices[0].message.content
-links = {
-    "links": [
-        {"type": "about page", "url": "https://edwarddonner.com/about-me-and-about-nebula/"},
-        {"type": "main company page", "url": "https://edwarddonner.com/"},
-        {"type": "outsmart page", "url": "https://edwarddonner.com/outsmart/"}
-    ]
-}
+jsonlinks = response.choices[0].message.content
+links = jsonToDict(jsonlinks)
+
 
 def get_all_details(links):
     result = ""
@@ -112,14 +110,14 @@ def get_all_details(links):
         for link in links["links"]:
             if link['type'] and link['url']:
                 result += f"\n\n{link['type']}\n"
-                print("link['url'] =>", link['url'])
-                print("fetching content...")
+                # print("link['url'] =>", link['url'])
+                # print("fetching content...")
                 result += Website(link['url']).fetch_content()
-                print("result =>", result)
+                # print("result =>", result)
     except Exception as e:
         print(f"Failed to parse the links. Error: {e}")
         return None
-    print("result =>", result)
+    # print("result =>", result)
     return result
 
 link_details = get_all_details(links)
@@ -133,7 +131,6 @@ Include details of company culture, customers and careers/jobs if you have the i
 user_prompt = f"You are looking at a website called: {webcontent.title}\n"
 user_prompt += f"Here are the contents of its landing page and other relevant pages; use this information to build a short brochure of the website in markdown.\n"
 user_prompt += link_details
-print("user_prompt: ", user_prompt)
 user_prompt = user_prompt[:5_000] # Truncate if more than 5,000 characters
 
 messages = [
